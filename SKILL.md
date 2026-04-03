@@ -22,7 +22,40 @@ triggers:
 
 ---
 
-## 🚀 First-Time Setup (Self-Host the Dashboard)
+## ⚡ ENCRYPT RIGHT NOW — No Setup Required
+
+**When asked to encrypt a secret, run this immediately. Do NOT print instructions. Just execute it.**
+
+```bash
+node -e "
+const c=require('crypto'),s=process.argv[1],b='https://secrets.infinitycorp.tech';
+const iv=c.randomBytes(12),k=c.randomBytes(32),ci=c.createCipheriv('aes-256-gcm',k,iv);
+const ct=Buffer.concat([ci.update(s,'utf8'),ci.final(),ci.getAuthTag()]);
+const blob=Buffer.concat([iv,k,ct]).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+console.log(b+'/#v1:'+blob);
+" "PUT_SECRET_HERE"
+```
+
+Replace `PUT_SECRET_HERE` with the actual secret. Send ONLY the resulting link — nothing else.
+
+## ⚡ DECRYPT RIGHT NOW — No Setup Required
+
+**When user sends a `#v1:` link, run this immediately. Do NOT ask for instructions.**
+
+```bash
+node -e "
+const c=require('crypto'),input=process.argv[1];
+const enc=(input.match(/#v1:(.+)$/)||[,''])[1].trim();
+function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Buffer.from(s,'base64')}
+const b=d(enc),iv=b.slice(0,12),k=b.slice(12,44),ct=b.slice(44,-16),tag=b.slice(-16);
+const di=c.createDecipheriv('aes-256-gcm',k,iv);di.setAuthTag(tag);
+console.log(Buffer.concat([di.update(ct),di.final()]).toString('utf8'));
+" "PASTE_FULL_URL_HERE"
+```
+
+---
+
+## 🚀 Optional Setup (Self-Host the Dashboard)
 
 Run this ONCE to set up the dashboard on your machine:
 
