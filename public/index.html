@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecretShare — Secure One-Time Links</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #238636;
+    --accent-hover: #2ea043;
+    --danger: #da3633;
+    --link: #58a6ff;
+    --success-bg: #0d2818;
+    --success-border: #238636;
+    --radius: 10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 580px;
+    padding: 36px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .logo-icon {
+    font-size: 24px;
+  }
+  .logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .logo-badge {
+    font-size: 11px;
+    background: #1f3a1f;
+    color: #3fb950;
+    border: 1px solid #2ea043;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 14px;
+    padding: 12px 14px;
+    resize: vertical;
+    min-height: 120px;
+    outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+  textarea:focus { border-color: var(--link); }
+  textarea::placeholder { color: #484f58; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 12px;
+    font-size: 15px;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+  .btn-copy {
+    background: #21262d;
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    padding: 7px 14px;
+  }
+  .btn-copy:hover { background: #30363d; }
+  .btn-copy.copied { background: var(--success-bg); border-color: var(--success-border); color: #3fb950; }
+
+  .result {
+    display: none;
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius);
+  }
+  .result.visible { display: block; }
+
+  .result-label {
+    font-size: 12px;
+    color: #3fb950;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  .url-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .url-box {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--link);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  .security-note {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .security-note span { color: #3fb950; }
+
+  /* ── VIEW MODE ── */
+  .secret-view {
+    display: none;
+  }
+  .secret-view.visible {
+    display: block;
+  }
+
+  .secret-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    font-family: monospace;
+    font-size: 14px;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    margin-bottom: 12px;
+    min-height: 60px;
+  }
+
+  .warning-banner {
+    background: #2d1a00;
+    border: 1px solid #6e4400;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #e3b341;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .error-banner {
+    background: #2d0a0a;
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff7b72;
+    margin-top: 16px;
+    display: none;
+    line-height: 1.5;
+  }
+  .error-banner.visible { display: block; }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0;
+  }
+
+  .footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 11px;
+    color: #484f58;
+  }
+  .footer a { color: var(--muted); text-decoration: none; }
+  .footer a:hover { color: var(--text); }
+
+  .props {
+    display: flex;
+    gap: 16px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .prop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .prop .dot { width: 6px; height: 6px; border-radius: 50%; background: #3fb950; }
+
+  .tab-row {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+  }
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--link);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <span class="logo-icon">🔐</span>
+    <span class="logo-text">SecretShare</span>
+    <span class="logo-badge">E2E Encrypted</span>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- CREATE MODE -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="create-mode">
+    <div class="tab-row">
+      <div class="tab active">Create Link</div>
+    </div>
+
+    <label for="secret-input">Your Secret</label>
+    <textarea
+      id="secret-input"
+      placeholder="Paste your password, API key, token, or any sensitive text here..."
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+    ></textarea>
+
+    <button class="btn btn-primary" id="encrypt-btn" onclick="createLink()">
+      🔒 Generate Secure Link
+    </button>
+
+    <div class="error-banner" id="create-error"></div>
+
+    <div class="result" id="result">
+      <div class="result-label">✅ Secure Link Ready</div>
+      <div class="url-row">
+        <div class="url-box" id="output-url"></div>
+        <button class="btn btn-copy" id="copy-btn" onclick="copyLink()">Copy</button>
+      </div>
+      <div class="security-note">
+        <span>🔑 Key is in the URL fragment only</span> — the server never sees it.<br>
+        Share this link via any channel. The recipient opens it once to see the secret.
+      </div>
+    </div>
+
+    <div class="props">
+      <div class="prop"><div class="dot"></div>AES-256-GCM encryption</div>
+      <div class="prop"><div class="dot"></div>Key never touches server</div>
+      <div class="prop"><div class="dot"></div>Zero dependencies</div>
+      <div class="prop"><div class="dot"></div>Works in any browser</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- VIEW MODE -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="view-mode" class="secret-view">
+    <div class="tab-row">
+      <div class="tab active">View Secret</div>
+    </div>
+
+    <div class="warning-banner">
+      ⚠️ View this secret once, then close the tab. Don't screenshot or copy into unsecured apps.
+    </div>
+
+    <label>Decrypted Secret</label>
+    <div class="secret-box" id="decrypted-output">Decrypting...</div>
+
+    <div class="url-row">
+      <button class="btn btn-copy" id="copy-secret-btn" onclick="copySecret()" style="flex:1;justify-content:center">
+        📋 Copy Secret
+      </button>
+      <button class="btn btn-copy" onclick="clearSecret()" style="flex:1;justify-content:center;color:#ff7b72">
+        🗑️ Clear & Close
+      </button>
+    </div>
+
+    <div class="error-banner visible" id="decrypt-error" style="display:none"></div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="footer">
+    Zero-storage · Client-side crypto · <a href="/">Create another link</a>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════
+
+function b64urlEncode(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function b64urlDecode(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  const bin = atob(str);
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+
+// ════════════════════════════════════════════════════════
+// ENCRYPT
+// ════════════════════════════════════════════════════════
+
+async function createLink() {
+  const secret = document.getElementById('secret-input').value.trim();
+  const errEl = document.getElementById('create-error');
+  errEl.classList.remove('visible');
+
+  if (!secret) {
+    errEl.textContent = 'Please enter a secret to encrypt.';
+    errEl.classList.add('visible');
+    return;
+  }
+
+  const btn = document.getElementById('encrypt-btn');
+  btn.disabled = true;
+  btn.textContent = '🔒 Encrypting...';
+
+  try {
+    // Generate IV (12 bytes) and key (32 bytes)
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const rawKey = crypto.getRandomValues(new Uint8Array(32));
+
+    // Import key
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']
+    );
+
+    // Encrypt
+    const encoded = new TextEncoder().encode(secret);
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv }, cryptoKey, encoded
+    );
+
+    // Blob: iv(12) + key(32) + ciphertext
+    const blob = new Uint8Array(12 + 32 + ciphertext.byteLength);
+    blob.set(iv, 0);
+    blob.set(rawKey, 12);
+    blob.set(new Uint8Array(ciphertext), 44);
+
+    const encoded64 = b64urlEncode(blob.buffer);
+    const url = `${location.origin}/#v1:${encoded64}`;
+
+    document.getElementById('output-url').textContent = url;
+    document.getElementById('result').classList.add('visible');
+
+    // Clear the input after generating link
+    document.getElementById('secret-input').value = '';
+
+  } catch (e) {
+    errEl.textContent = `Encryption failed: ${e.message}`;
+    errEl.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔒 Generate Secure Link';
+  }
+}
+
+async function copyLink() {
+  const url = document.getElementById('output-url').textContent;
+  const btn = document.getElementById('copy-btn');
+  try {
+    await navigator.clipboard.writeText(url);
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  } catch {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ Copied!';
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// DECRYPT
+// ════════════════════════════════════════════════════════
+
+async function decryptFromHash() {
+  const hash = location.hash;
+  if (!hash || !hash.startsWith('#v1:')) return;
+
+  // Switch to view mode
+  document.getElementById('create-mode').style.display = 'none';
+  document.getElementById('view-mode').classList.add('visible');
+
+  const errEl = document.getElementById('decrypt-error');
+  const outEl = document.getElementById('decrypted-output');
+
+  try {
+    const b64 = hash.slice(4); // remove #v1:
+    const blob = b64urlDecode(b64);
+
+    if (blob.length < 44) throw new Error('URL is too short — may be corrupted.');
+
+    const iv = blob.slice(0, 12);
+    const rawKey = blob.slice(12, 44);
+    const ciphertext = blob.slice(44);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']
+    );
+
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv }, cryptoKey, ciphertext
+    );
+
+    const decoded = new TextDecoder().decode(plaintext);
+    outEl.textContent = decoded;
+
+  } catch (e) {
+    outEl.textContent = '';
+    errEl.textContent = `❌ Decryption failed: ${e.message}\n\nThe URL may be corrupted, truncated, or tampered with.`;
+    errEl.style.display = 'block';
+  }
+}
+
+let _decryptedValue = '';
+
+async function copySecret() {
+  const text = document.getElementById('decrypted-output').textContent;
+  const btn = document.getElementById('copy-secret-btn');
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy Secret';
+      btn.classList.remove('copied');
+    }, 2000);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ Copied!';
+  }
+}
+
+function clearSecret() {
+  document.getElementById('decrypted-output').textContent = '';
+  // Remove hash from URL without reload
+  history.replaceState(null, '', location.pathname);
+  window.close();
+  // If window.close() doesn't work (not opened by script)
+  document.getElementById('view-mode').innerHTML = '<div style="text-align:center;padding:40px;color:#8b949e;font-size:14px">🔒 Secret cleared. You can close this tab.</div>';
+}
+
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (location.hash && location.hash.startsWith('#v1:')) {
+    decryptFromHash();
+  }
+});
+
+// Handle Enter key in textarea (Ctrl+Enter)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    createLink();
+  }
+});
+</script>
+</body>
+</html>

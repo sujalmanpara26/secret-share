@@ -1,0 +1,16 @@
+{
+  "name": "secure-secret-share",
+  "version": "2.0.0",
+  "description": "Zero-storage E2E encrypted secret sharing via URL fragments",
+  "main": "serve.js",
+  "scripts": {
+    "start": "node serve.js",
+    "dev": "NODE_ENV=dev node serve.js",
+    "encrypt": "node scripts/encrypt.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": ["secret", "share", "e2e", "encryption", "aes-gcm"],
+  "license": "MIT"
+}
