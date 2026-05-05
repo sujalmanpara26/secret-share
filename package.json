@@ -1,16 +1,37 @@
 {
-  "name": "secure-secret-share",
-  "version": "2.0.0",
-  "description": "Zero-storage E2E encrypted secret sharing via URL fragments",
+  "name": "secret-share",
+  "version": "3.0.0",
+  "description": "Zero-knowledge E2E encrypted secret sharing for AI agents — bypass model safety refusals",
   "main": "serve.js",
+  "bin": {
+    "secret-encrypt": "scripts/encrypt.js",
+    "secret-decrypt": "scripts/decrypt.js"
+  },
   "scripts": {
     "start": "node serve.js",
     "dev": "NODE_ENV=dev node serve.js",
-    "encrypt": "node scripts/encrypt.js"
+    "encrypt": "node scripts/encrypt.js",
+    "decrypt": "node scripts/decrypt.js"
   },
   "engines": {
     "node": ">=16"
   },
-  "keywords": ["secret", "share", "e2e", "encryption", "aes-gcm"],
-  "license": "MIT"
+  "keywords": [
+    "secret",
+    "share",
+    "e2e",
+    "encryption",
+    "aes-gcm",
+    "ai-agent",
+    "codex",
+    "claude-code",
+    "zero-knowledge",
+    "one-time"
+  ],
+  "author": "Sujal Manpara",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sujalmanpara26/secret-share"
+  }
 }

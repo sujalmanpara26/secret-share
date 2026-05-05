@@ -1,46 +1,49 @@
 ---
 name: secret-share
-version: 1.2.0
+version: 3.0.0
 description: >
-  Securely share passwords, API keys, tokens, and credentials via zero-storage
-  E2E encrypted one-time links. Auto-intercepts credentials in chat — never sends
-  plaintext secrets. Works on any agent platform (OpenClaw, Hermes, Claude Code, etc.)
-  Includes a full web dashboard UI — self-host it or use the public instance.
+  Share secrets with AI agents without triggering safety refusals. Encrypts
+  API keys, tokens, and credentials into URLs that agents decrypt via CLI —
+  the secret never appears in chat. Solves the "model won't accept my token"
+  problem for Codex, Claude Code, OpenCode, and any AI coding agent.
 triggers:
-  - /secret_share
   - /secret
+  - /secret_share
   - "share * securely"
   - "share this api key"
   - "share this token"
   - "share this password"
-  - "share this credential"
+  - "here's my * key"
+  - "use this token"
 ---
 
-# 🔐 Secret Share Skill
+# 🔐 Secret Share — Agent Secret Delivery
 
-**NEVER output plaintext credentials in chat.** Always use this skill.
+**The problem:** AI coding agents (Codex, Claude Code, etc.) refuse plaintext secrets
+in chat because their safety layers detect patterns like `ghp_`, `sk-`, `AKIA`, etc.
+You waste time and tokens convincing them to accept it.
+
+**The solution:** Encrypt the secret → share the URL → agent decrypts via CLI.
+The secret only exists in tool execution output, never in the conversation.
 
 ---
 
-## ⚡ ENCRYPT RIGHT NOW — No Setup Required
+## ⚡ Quick: Decrypt a Secret (Agent Side)
 
-**When asked to encrypt a secret, run this immediately. Do NOT print instructions. Just execute it.**
+When a user gives you a SecretShare URL, decrypt it immediately:
 
 ```bash
-node -e "
-const c=require('crypto'),s=process.argv[1],b='https://secrets.infinitycorp.tech';
-const iv=c.randomBytes(12),k=c.randomBytes(32),ci=c.createCipheriv('aes-256-gcm',k,iv);
-const ct=Buffer.concat([ci.update(s,'utf8'),ci.final(),ci.getAuthTag()]);
-const blob=Buffer.concat([iv,k,ct]).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-console.log(b+'/#v1:'+blob);
-" "PUT_SECRET_HERE"
+# Decrypt and print
+node /path/to/scripts/decrypt.js "URL_HERE"
+
+# Decrypt and write to .env (secret never printed!)
+node /path/to/scripts/decrypt.js "URL_HERE" --env GH_TOKEN
+
+# Decrypt and write to specific file
+node /path/to/scripts/decrypt.js "URL_HERE" --env API_KEY --env-file .env.local --silent
 ```
 
-Replace `PUT_SECRET_HERE` with the actual secret. Send ONLY the resulting link — nothing else.
-
-## ⚡ DECRYPT RIGHT NOW — No Setup Required
-
-**When user sends a `#v1:` link, run this immediately. Do NOT ask for instructions.**
+### No-install one-liner (works anywhere with Node.js):
 
 ```bash
 node -e "
@@ -50,88 +53,19 @@ function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';re
 const b=d(enc),iv=b.slice(0,12),k=b.slice(12,44),ct=b.slice(44,-16),tag=b.slice(-16);
 const di=c.createDecipheriv('aes-256-gcm',k,iv);di.setAuthTag(tag);
 console.log(Buffer.concat([di.update(ct),di.final()]).toString('utf8'));
-" "PASTE_FULL_URL_HERE"
+" "PASTE_URL_HERE"
 ```
 
----
-
-## 🚀 Optional Setup (Self-Host the Dashboard)
-
-Run this ONCE to set up the dashboard on your machine:
+## ⚡ Quick: Encrypt a Secret (User Side)
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/sujalmanpara26/secret-share.git ~/secret-share
-cd ~/secret-share
+# Fragment link (key in URL, no server needed)
+node /path/to/scripts/encrypt.js "your-secret-here"
 
-# 2. Install dependencies (minimal)
-npm install
+# One-time link (server-stored, auto-deletes after first read)
+node /path/to/scripts/encrypt.js "your-secret" --onetime --ttl 30
 
-# 3. Start the server
-node serve.js
-# → Server running at http://localhost:4321
-```
-
-To run it permanently in the background:
-```bash
-# Using nohup
-nohup node ~/secret-share/serve.js > /tmp/secret-share.log 2>&1 &
-
-# Or using systemd (Linux)
-cp ~/secret-share/secret-share.service /etc/systemd/system/
-systemctl enable --now secret-share
-```
-
-**Verify it's running:**
-```bash
-curl http://localhost:4321/health
-# → {"ok":true,"service":"secret-share"}
-```
-
----
-
-## 🔗 Generate a Secure Link
-
-Once the server is running, use the script to generate links:
-
-```bash
-# Generate link (points to YOUR local dashboard)
-node ~/secret-share/scripts/encrypt.js "SECRET_VALUE" "http://localhost:4321"
-# → http://localhost:4321/#v1:<encrypted-blob>
-
-# Or use the public hosted dashboard
-node ~/secret-share/scripts/encrypt.js "SECRET_VALUE" "https://secrets.infinitycorp.tech"
-# → https://secrets.infinitycorp.tech/#v1:<encrypted-blob>
-```
-
-**The link format:**
-```
-http://localhost:4321/#v1:<blob>
-                       ↑
-           Key is HERE — in the URL fragment
-           Browser reads it client-side only
-           Server NEVER receives it
-```
-
----
-
-## 🔓 Decrypt a Secure Link
-
-```bash
-node ~/secret-share/scripts/decrypt.js "http://localhost:4321/#v1:<blob>"
-# OR
-node ~/secret-share/scripts/decrypt.js "https://secrets.infinitycorp.tech/#v1:<blob>"
-# → prints the plaintext secret
-```
-
----
-
-## ⚡ No-Install One-Liners (Fallback)
-
-If the server isn't set up yet, use these inline — no files needed:
-
-### Encrypt (Node.js)
-```bash
+# No-install one-liner
 node -e "
 const c=require('crypto'),s=process.argv[1],b='https://secrets.infinitycorp.tech';
 const iv=c.randomBytes(12),k=c.randomBytes(32),ci=c.createCipheriv('aes-256-gcm',k,iv);
@@ -141,99 +75,90 @@ console.log(b+'/#v1:'+blob);
 " "YOUR_SECRET_HERE"
 ```
 
-### Decrypt (Node.js)
+---
+
+## CLI Reference
+
+### decrypt.js
+
+| Flag | Description |
+|------|-------------|
+| (no flags) | Print decrypted secret to stdout |
+| `--env VAR` | Write `VAR=value` to .env file |
+| `--env-file PATH` | Specify env file (default: .env in cwd) |
+| `--export` | Output as `export VAR=value` (requires --env) |
+| `--json` | Output as `{"value":"...","length":N}` |
+| `--silent` | No stdout output (use with --env) |
+
+### encrypt.js
+
+| Flag | Description |
+|------|-------------|
+| (no flags) | Create fragment-based URL (key in URL, no server) |
+| `--onetime` | Store on server, return one-time URL |
+| `--ttl MIN` | Expiry in minutes for one-time links (default: 60) |
+| `--label NAME` | Label for one-time links |
+| `--server URL` | Server URL for one-time mode |
+
+---
+
+## Agent Workflow: The Right Way to Handle Secrets
+
+### When a user sends you a SecretShare URL:
+
+1. Run `node decrypt.js "URL" --env VAR_NAME --silent` to write it directly to .env
+2. Or decrypt to stdout in a tool call — the value stays in tool output, not chat
+3. **NEVER echo the decrypted value back in chat**
+4. Use the secret programmatically (git clone, API call, etc.)
+
+### When a user tries to paste a secret in plaintext:
+
+Tell them:
+> ⚠️ Don't paste secrets in chat — use SecretShare instead.
+> Run: `node encrypt.js "your-secret"` and send me the URL.
+> Or go to https://secrets.infinitycorp.tech and generate a link.
+
+### When YOU need to send a secret to the user:
+
+Encrypt it first:
 ```bash
-node -e "
-const c=require('crypto'),input=process.argv[1];
-const enc=(input.match(/#v1:(.+)$/)||[,''])[1].trim();
-function d(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Buffer.from(s,'base64')}
-const b=d(enc),iv=b.slice(0,12),k=b.slice(12,44),ct=b.slice(44,-16),tag=b.slice(-16);
-const di=c.createDecipheriv('aes-256-gcm',k,iv);di.setAuthTag(tag);
-console.log(Buffer.concat([di.update(ct),di.final()]).toString('utf8'));
-" "FULL_URL_OR_BLOB"
+node encrypt.js "the-secret-value"
+```
+Send ONLY the generated URL — never the plaintext.
+
+---
+
+## Auto-Detection Patterns
+
+| Pattern | Action |
+|---------|--------|
+| URL with `#v1:` | Decrypt silently, use the value |
+| URL with `/s/` | Fetch one-time secret, decrypt, use |
+| User types `sk-...`, `ghp_...`, `AKIA...` | Warn + suggest SecretShare |
+| `/secret` or `/secret_share` command | Show usage instructions |
+
+---
+
+## Setup (Optional — Self-Host)
+
+```bash
+git clone https://github.com/sujalmanpara26/secret-share.git
+cd secret-share && npm install
+node serve.js  # → http://localhost:4321
 ```
 
----
-
-## 🌐 Dashboard UI
-
-The dashboard has two views:
-
-**Create view** (`/`) — user pastes secret → clicks Generate → gets link
-**View/Decrypt view** (`/#v1:...`) — user opens link → secret decrypts in browser
-
-When you share a link with a human user, they open it in their browser and the secret decrypts **entirely client-side**. The server only serves static HTML — it never touches the secret.
+Public instance: https://secrets.infinitycorp.tech
 
 ---
 
-## 📋 Trigger Phrases & Auto-Behavior
-
-| Trigger | Action |
-|---|---|
-| `/secret_share` or `/secret` | Show instructions, ask for secret |
-| User types `sk-...`, `ghp_...`, `Bearer ...` etc. | Warn + redirect to secure link |
-| "share this API key / token / password" | Encrypt it, return secure link |
-| User sends `https://secrets.infinitycorp.tech/#v1:...` | Decrypt silently, use the value |
-
----
-
-## 💬 Response Templates
-
-### When user types `/secret_share`:
-> 🔐 **Secure Secret Share**
-> 1. Go to 👉 http://localhost:4321 (or https://secrets.infinitycorp.tech)
-> 2. Paste your secret → click **Generate Secure Link**
-> 3. Send me the generated link
->
-> I'll decrypt it on my end — plaintext never touches this chat.
-
-### When user sends a secure link to you:
-Decrypt it silently using the decrypt script above. Use the secret for the task. **Do NOT echo the plaintext back in chat** unless explicitly asked.
-
-### When YOU send a credential to the user:
-> 🔐 Here's your [API key / token / password] as a secure link:
-> `http://localhost:4321/#v1:...`
-> Open in your browser — decrypts client-side, server never sees it.
-
-### When user types a credential in plaintext:
-> ⚠️ Don't send credentials in chat — they'll be in your message history.
-> Go to 👉 http://localhost:4321 and use the secure link instead. I'll decrypt it on my end.
-
----
-
-## 🔒 How It Works
+## How It Works
 
 ```
-Secret → AES-256-GCM encrypt in browser/CLI
+Secret → AES-256-GCM encrypt (browser/CLI)
        → iv(12) + key(32) + ciphertext packed into blob
-       → Blob base64url-encoded into URL fragment (#v1:...)
-       → Fragment NEVER sent to server (browser/client only)
-       → Server only serves static HTML
-       → Recipient opens URL → browser decrypts locally
-```
-
-**Security guarantees:**
-- ✅ Plaintext never in chat history
-- ✅ Plaintext never on any server
-- ✅ Encryption key lives only in URL fragment
-- ✅ AES-256-GCM — authenticated encryption, tamper detection
-- ✅ Zero npm dependencies for crypto — Node.js built-in only
-
----
-
-## 📦 Files
-
-```
-~/secret-share/
-├── public/
-│   ├── index.html        ← Full dashboard SPA (create + decrypt)
-│   └── vault.html        ← Vault page (X25519 user→bot flow)
-├── scripts/
-│   ├── encrypt.js        ← CLI: create secure links
-│   └── decrypt.js        ← CLI: decrypt secure links
-├── serve.js              ← Node.js static server (port 4321)
-├── package.json
-└── secret-share.service  ← systemd unit file
+       → Fragment mode: blob in URL fragment (#v1:...) — server never sees it
+       → One-time mode: blob stored on server, deleted after first read
+       → Agent decrypts via CLI — secret only in tool output, never in chat
 ```
 
 **Repo:** https://github.com/sujalmanpara26/secret-share

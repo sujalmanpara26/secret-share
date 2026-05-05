@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SecretShare — Secure One-Time Links</title>
+<title>SecretShare — Zero-Knowledge Secret Sharing</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -19,6 +19,8 @@
     --link: #58a6ff;
     --success-bg: #0d2818;
     --success-border: #238636;
+    --warning-bg: #2d1a00;
+    --warning-border: #6e4400;
     --radius: 10px;
   }
 
@@ -48,14 +50,8 @@
     gap: 10px;
     margin-bottom: 28px;
   }
-  .logo-icon {
-    font-size: 24px;
-  }
-  .logo-text {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text);
-  }
+  .logo-icon { font-size: 24px; }
+  .logo-text { font-size: 20px; font-weight: 700; color: var(--text); }
   .logo-badge {
     font-size: 11px;
     background: #1f3a1f;
@@ -76,7 +72,7 @@
     letter-spacing: 0.5px;
   }
 
-  textarea {
+  textarea, input[type="text"], input[type="number"] {
     width: 100%;
     background: var(--bg);
     border: 1px solid var(--border);
@@ -85,14 +81,13 @@
     font-family: 'SFMono-Regular', Consolas, monospace;
     font-size: 14px;
     padding: 12px 14px;
-    resize: vertical;
-    min-height: 120px;
     outline: none;
     transition: border-color 0.15s;
     line-height: 1.5;
   }
-  textarea:focus { border-color: var(--link); }
-  textarea::placeholder { color: #484f58; }
+  textarea { resize: vertical; min-height: 120px; }
+  textarea:focus, input:focus { border-color: var(--link); }
+  textarea::placeholder, input::placeholder { color: #484f58; }
 
   .btn {
     display: inline-flex;
@@ -146,6 +141,19 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge-onetime {
+    font-size: 10px;
+    background: #2d1a00;
+    color: #e3b341;
+    border: 1px solid #6e4400;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-weight: 600;
   }
 
   .url-row {
@@ -174,13 +182,55 @@
   }
   .security-note span { color: #3fb950; }
 
-  /* ── VIEW MODE ── */
-  .secret-view {
+  /* ── MODE TOGGLE ── */
+  .mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  /* ── ONE-TIME OPTIONS ── */
+  .onetime-options {
     display: none;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
   }
-  .secret-view.visible {
-    display: block;
-  }
+  .onetime-options.visible { display: block; }
+  .onetime-options .field { margin-bottom: 10px; }
+  .onetime-options .field:last-child { margin-bottom: 0; }
+  .onetime-options label { font-size: 11px; margin-bottom: 4px; }
+  .onetime-options input { font-size: 13px; padding: 8px 10px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+
+  /* ── VIEW MODE ── */
+  .secret-view { display: none; }
+  .secret-view.visible { display: block; }
 
   .secret-box {
     background: var(--bg);
@@ -198,8 +248,8 @@
   }
 
   .warning-banner {
-    background: #2d1a00;
-    border: 1px solid #6e4400;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
     border-radius: 6px;
     padding: 10px 14px;
     font-size: 12px;
@@ -221,11 +271,7 @@
   }
   .error-banner.visible { display: block; }
 
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 28px 0;
-  }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
 
   .footer {
     margin-top: 24px;
@@ -262,15 +308,10 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--muted);
-    cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
-    transition: color 0.15s;
   }
-  .tab.active {
-    color: var(--text);
-    border-bottom-color: var(--link);
-  }
+  .tab.active { color: var(--text); border-bottom-color: var(--link); }
 </style>
 </head>
 <body>
@@ -298,6 +339,26 @@
       spellcheck="false"
     ></textarea>
 
+    <!-- Mode Toggle -->
+    <div class="mode-toggle" style="margin-top: 16px;">
+      <button class="mode-btn active" onclick="setMode('fragment')" id="mode-fragment">🔗 Encrypted Link</button>
+      <button class="mode-btn" onclick="setMode('onetime')" id="mode-onetime">⏱️ One-Time Link</button>
+    </div>
+
+    <!-- One-Time Options -->
+    <div class="onetime-options" id="onetime-opts">
+      <div class="field-row">
+        <div class="field">
+          <label for="ttl-input">Expires After (minutes)</label>
+          <input type="number" id="ttl-input" value="60" min="1" max="1440" placeholder="60">
+        </div>
+        <div class="field">
+          <label for="label-input">Label (optional)</label>
+          <input type="text" id="label-input" placeholder="e.g. GitHub Token">
+        </div>
+      </div>
+    </div>
+
     <button class="btn btn-primary" id="encrypt-btn" onclick="createLink()">
       🔒 Generate Secure Link
     </button>
@@ -305,27 +366,27 @@
     <div class="error-banner" id="create-error"></div>
 
     <div class="result" id="result">
-      <div class="result-label">✅ Secure Link Ready</div>
+      <div class="result-label">
+        ✅ Secure Link Ready
+        <span class="badge-onetime" id="badge-onetime" style="display:none">ONE-TIME</span>
+      </div>
       <div class="url-row">
         <div class="url-box" id="output-url"></div>
         <button class="btn btn-copy" id="copy-btn" onclick="copyLink()">Copy</button>
       </div>
-      <div class="security-note">
-        <span>🔑 Key is in the URL fragment only</span> — the server never sees it.<br>
-        Share this link via any channel. The recipient opens it once to see the secret.
-      </div>
+      <div class="security-note" id="result-note"></div>
     </div>
 
     <div class="props">
       <div class="prop"><div class="dot"></div>AES-256-GCM encryption</div>
       <div class="prop"><div class="dot"></div>Key never touches server</div>
       <div class="prop"><div class="dot"></div>Zero dependencies</div>
-      <div class="prop"><div class="dot"></div>Works in any browser</div>
+      <div class="prop"><div class="dot"></div>Works with any AI agent</div>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════ -->
-  <!-- VIEW MODE -->
+  <!-- VIEW MODE (fragment-based) -->
   <!-- ══════════════════════════════════════ -->
   <div id="view-mode" class="secret-view">
     <div class="tab-row">
@@ -348,17 +409,63 @@
       </button>
     </div>
 
-    <div class="error-banner visible" id="decrypt-error" style="display:none"></div>
+    <div class="error-banner" id="decrypt-error" style="display:none"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- VIEW MODE (one-time server-stored) -->
+  <!-- ══════════════════════════════════════ -->
+  <div id="onetime-view-mode" class="secret-view">
+    <div class="tab-row">
+      <div class="tab active">🔓 One-Time Secret</div>
+    </div>
+
+    <div class="warning-banner">
+      ⏱️ This secret can only be viewed <strong>once</strong>. After you see it, it's permanently deleted from the server.
+    </div>
+
+    <div id="onetime-loading">
+      <div class="secret-box" style="text-align:center;color:var(--muted)">Fetching & decrypting...</div>
+    </div>
+
+    <div id="onetime-reveal" style="display:none">
+      <label>Decrypted Secret</label>
+      <div class="secret-box" id="onetime-output"></div>
+      <div class="url-row">
+        <button class="btn btn-copy" onclick="copyOneTimeSecret()" id="copy-onetime-btn" style="flex:1;justify-content:center">
+          📋 Copy Secret
+        </button>
+        <button class="btn btn-copy" onclick="clearOneTimeSecret()" style="flex:1;justify-content:center;color:#ff7b72">
+          🗑️ Clear & Close
+        </button>
+      </div>
+    </div>
+
+    <div class="error-banner" id="onetime-error" style="display:none"></div>
   </div>
 
   <hr class="divider">
 
   <div class="footer">
     Zero-storage · Client-side crypto · <a href="/">Create another link</a>
+    <br>
+    <a href="https://github.com/sujalmanpara26/secret-share" style="margin-top:4px;display:inline-block">Powered by SecretShare</a>
   </div>
 </div>
 
 <script>
+// ════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════
+let currentMode = 'fragment'; // 'fragment' or 'onetime'
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-fragment').classList.toggle('active', mode === 'fragment');
+  document.getElementById('mode-onetime').classList.toggle('active', mode === 'onetime');
+  document.getElementById('onetime-opts').classList.toggle('visible', mode === 'onetime');
+}
+
 // ════════════════════════════════════════════════════════
 // UTILITIES
 // ════════════════════════════════════════════════════════
@@ -379,6 +486,27 @@ function b64urlDecode(str) {
 // ENCRYPT
 // ════════════════════════════════════════════════════════
 
+async function encryptSecret(plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const rawKey = crypto.getRandomValues(new Uint8Array(32));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']
+  );
+
+  const encoded = new TextEncoder().encode(plaintext);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, cryptoKey, encoded
+  );
+
+  const blob = new Uint8Array(12 + 32 + ciphertext.byteLength);
+  blob.set(iv, 0);
+  blob.set(rawKey, 12);
+  blob.set(new Uint8Array(ciphertext), 44);
+
+  return b64urlEncode(blob.buffer);
+}
+
 async function createLink() {
   const secret = document.getElementById('secret-input').value.trim();
   const errEl = document.getElementById('create-error');
@@ -395,38 +523,51 @@ async function createLink() {
   btn.textContent = '🔒 Encrypting...';
 
   try {
-    // Generate IV (12 bytes) and key (32 bytes)
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const rawKey = crypto.getRandomValues(new Uint8Array(32));
+    const encoded64 = await encryptSecret(secret);
 
-    // Import key
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']
-    );
+    if (currentMode === 'onetime') {
+      // Store on server
+      const ttl = parseInt(document.getElementById('ttl-input').value) || 60;
+      const label = document.getElementById('label-input').value.trim();
 
-    // Encrypt
-    const encoded = new TextEncoder().encode(secret);
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv }, cryptoKey, encoded
-    );
+      const res = await fetch('/api/secrets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blob: encoded64, ttl, label: label || undefined }),
+      });
 
-    // Blob: iv(12) + key(32) + ciphertext
-    const blob = new Uint8Array(12 + 32 + ciphertext.byteLength);
-    blob.set(iv, 0);
-    blob.set(rawKey, 12);
-    blob.set(new Uint8Array(ciphertext), 44);
+      if (res.status === 429) {
+        throw new Error('Rate limited — try again later.');
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
 
-    const encoded64 = b64urlEncode(blob.buffer);
-    const url = `${location.origin}/#v1:${encoded64}`;
+      const data = await res.json();
+      document.getElementById('output-url').textContent = data.url;
+      document.getElementById('badge-onetime').style.display = 'inline';
 
-    document.getElementById('output-url').textContent = url;
+      const mins = Math.round((new Date(data.expiresAt) - Date.now()) / 60000);
+      document.getElementById('result-note').innerHTML =
+        `<span>⏱️ One-time link</span> — expires in ${mins}m, auto-deletes after first view.<br>` +
+        `Share this link. The recipient opens it once to see the secret.`;
+
+    } else {
+      // Fragment-based (no server storage)
+      const url = `${location.origin}/#v1:${encoded64}`;
+      document.getElementById('output-url').textContent = url;
+      document.getElementById('badge-onetime').style.display = 'none';
+      document.getElementById('result-note').innerHTML =
+        `<span>🔑 Key is in the URL fragment only</span> — the server never sees it.<br>` +
+        `Share this link via any channel. The recipient opens it to see the secret.`;
+    }
+
     document.getElementById('result').classList.add('visible');
-
-    // Clear the input after generating link
     document.getElementById('secret-input').value = '';
 
   } catch (e) {
-    errEl.textContent = `Encryption failed: ${e.message}`;
+    errEl.textContent = `Failed: ${e.message}`;
     errEl.classList.add('visible');
   } finally {
     btn.disabled = false;
@@ -441,31 +582,21 @@ async function copyLink() {
     await navigator.clipboard.writeText(url);
     btn.textContent = '✅ Copied!';
     btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = 'Copy';
-      btn.classList.remove('copied');
-    }, 2000);
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
   } catch {
-    // Fallback
-    const ta = document.createElement('textarea');
-    ta.value = url;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    fallbackCopy(url);
     btn.textContent = '✅ Copied!';
   }
 }
 
 // ════════════════════════════════════════════════════════
-// DECRYPT
+// DECRYPT (fragment-based)
 // ════════════════════════════════════════════════════════
 
 async function decryptFromHash() {
   const hash = location.hash;
   if (!hash || !hash.startsWith('#v1:')) return;
 
-  // Switch to view mode
   document.getElementById('create-mode').style.display = 'none';
   document.getElementById('view-mode').classList.add('visible');
 
@@ -473,9 +604,8 @@ async function decryptFromHash() {
   const outEl = document.getElementById('decrypted-output');
 
   try {
-    const b64 = hash.slice(4); // remove #v1:
+    const b64 = hash.slice(4);
     const blob = b64urlDecode(b64);
-
     if (blob.length < 44) throw new Error('URL is too short — may be corrupted.');
 
     const iv = blob.slice(0, 12);
@@ -490,9 +620,7 @@ async function decryptFromHash() {
       { name: 'AES-GCM', iv }, cryptoKey, ciphertext
     );
 
-    const decoded = new TextDecoder().decode(plaintext);
-    outEl.textContent = decoded;
-
+    outEl.textContent = new TextDecoder().decode(plaintext);
   } catch (e) {
     outEl.textContent = '';
     errEl.textContent = `❌ Decryption failed: ${e.message}\n\nThe URL may be corrupted, truncated, or tampered with.`;
@@ -500,37 +628,110 @@ async function decryptFromHash() {
   }
 }
 
-let _decryptedValue = '';
-
 async function copySecret() {
   const text = document.getElementById('decrypted-output').textContent;
   const btn = document.getElementById('copy-secret-btn');
-  try {
-    await navigator.clipboard.writeText(text);
-    btn.textContent = '✅ Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = '📋 Copy Secret';
-      btn.classList.remove('copied');
-    }, 2000);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✅ Copied!';
-  }
+  await doCopy(text, btn, '📋 Copy Secret');
 }
 
 function clearSecret() {
   document.getElementById('decrypted-output').textContent = '';
-  // Remove hash from URL without reload
   history.replaceState(null, '', location.pathname);
   window.close();
-  // If window.close() doesn't work (not opened by script)
-  document.getElementById('view-mode').innerHTML = '<div style="text-align:center;padding:40px;color:#8b949e;font-size:14px">🔒 Secret cleared. You can close this tab.</div>';
+  document.getElementById('view-mode').innerHTML =
+    '<div style="text-align:center;padding:40px;color:#8b949e;font-size:14px">🔒 Secret cleared. You can close this tab.</div>';
+}
+
+// ════════════════════════════════════════════════════════
+// DECRYPT (one-time server-stored)
+// ════════════════════════════════════════════════════════
+
+async function fetchOneTimeSecret() {
+  const match = location.pathname.match(/^\/s\/([a-zA-Z0-9_-]+)$/);
+  if (!match) return;
+
+  const id = match[1];
+
+  document.getElementById('create-mode').style.display = 'none';
+  document.getElementById('onetime-view-mode').classList.add('visible');
+
+  const errEl = document.getElementById('onetime-error');
+
+  try {
+    const res = await fetch(`/api/secrets/${id}`);
+
+    if (res.status === 404) {
+      throw new Error('Secret not found — it was already viewed or has expired.');
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // Decrypt the blob
+    const blob = b64urlDecode(data.blob);
+    if (blob.length < 44) throw new Error('Blob is too short — may be corrupted.');
+
+    const iv = blob.slice(0, 12);
+    const rawKey = blob.slice(12, 44);
+    const ciphertext = blob.slice(44);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']
+    );
+
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv }, cryptoKey, ciphertext
+    );
+
+    document.getElementById('onetime-output').textContent = new TextDecoder().decode(plaintext);
+    document.getElementById('onetime-loading').style.display = 'none';
+    document.getElementById('onetime-reveal').style.display = 'block';
+
+  } catch (e) {
+    document.getElementById('onetime-loading').style.display = 'none';
+    errEl.textContent = `❌ ${e.message}`;
+    errEl.style.display = 'block';
+  }
+}
+
+async function copyOneTimeSecret() {
+  const text = document.getElementById('onetime-output').textContent;
+  const btn = document.getElementById('copy-onetime-btn');
+  await doCopy(text, btn, '📋 Copy Secret');
+}
+
+function clearOneTimeSecret() {
+  document.getElementById('onetime-output').textContent = '';
+  document.getElementById('onetime-view-mode').innerHTML =
+    '<div style="text-align:center;padding:40px;color:#8b949e;font-size:14px">🔒 Secret cleared. You can close this tab.</div>';
+}
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+
+async function doCopy(text, btn, resetLabel) {
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = resetLabel; btn.classList.remove('copied'); }, 2000);
+  } catch {
+    fallbackCopy(text);
+    btn.textContent = '✅ Copied!';
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
 }
 
 // ════════════════════════════════════════════════════════
@@ -538,16 +739,21 @@ function clearSecret() {
 // ════════════════════════════════════════════════════════
 
 window.addEventListener('DOMContentLoaded', () => {
+  // One-time link: /s/:id
+  if (location.pathname.match(/^\/s\/[a-zA-Z0-9_-]+$/)) {
+    fetchOneTimeSecret();
+    return;
+  }
+
+  // Fragment-based link: /#v1:...
   if (location.hash && location.hash.startsWith('#v1:')) {
     decryptFromHash();
+    return;
   }
 });
 
-// Handle Enter key in textarea (Ctrl+Enter)
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    createLink();
-  }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) createLink();
 });
 </script>
 </body>
